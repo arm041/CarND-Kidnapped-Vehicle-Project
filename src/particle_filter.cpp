@@ -27,7 +27,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 
 	cout << "Start of initialization!!!!"<< endl;
 
-	num_particles = 100; //can be changed later to another number by arm041
+	num_particles = 200; //can be changed later to another number by arm041
 
 	default_random_engine gen;
 	double std_x, std_y, std_theta; // Standard deviations for x, y, and theta
@@ -56,10 +56,10 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 		temp.theta = theta + noise_theta;
 
 		//normalize the angles
-		while (temp.theta < -M_PI)
+		/*while (temp.theta < -M_PI)
 			temp.theta += 2 * M_PI;
 		while (temp.theta > M_PI)
-			temp.theta -= 2 * M_PI;
+			temp.theta -= 2 * M_PI;*/
 
 		temp.weight = 1.0;
 		particles.push_back(temp);
@@ -108,8 +108,8 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 
 		if (yaw_rate < 0.00000000001)
 		{
-			particles[i].x +=  velocity*cos(particles[i].theta) * delta_t + pos_x;
-			particles[i].y += velocity*sin(particles[i].theta) * delta_t + pos_y;
+			particles[i].x +=  (velocity*cos(particles[i].theta) * delta_t + pos_x);
+			particles[i].y += (velocity*sin(particles[i].theta) * delta_t + pos_y);
 			particles[i].theta += pos_yaw;
 		}
 		else
@@ -117,16 +117,16 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 			double angle = particles[i].theta + yaw_rate * delta_t;
 
 
-			particles[i].x += velocity/yaw_rate * (sin(angle) - sin(particles[i].theta)) + pos_x;
-			particles[i].y += velocity/yaw_rate * (-1*cos(angle) + cos(particles[i].theta)) + pos_y;
-			particles[i].theta += yaw_rate * delta_t + pos_yaw;
+			particles[i].x += (velocity/yaw_rate) * (sin(angle) - sin(particles[i].theta)) + pos_x;
+			particles[i].y += (velocity/yaw_rate) * (-1*cos(angle) + cos(particles[i].theta)) + pos_y;
+			particles[i].theta += (yaw_rate * delta_t) + pos_yaw;
 		}
 
 		//normalize the angles
-		while (particles[i].theta < -M_PI)
+		/*while (particles[i].theta < -M_PI)
 			particles[i].theta += 2 * M_PI;
 		while (particles[i].theta > M_PI)
-			particles[i].theta -= 2 * M_PI;
+			particles[i].theta -= 2 * M_PI;*/
 	}
 	cout << "end of prediction!!!"<< endl;
 
@@ -138,10 +138,11 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 	// NOTE: this method will NOT be called by the grading code. But you will probably find it useful to 
 	//   implement this method and use it as a helper during the updateWeights phase.
 
-	double nearest_neighbour =  100000;
+	double nearest_neighbour;
 	for (int i = 0; i < observations.size() ; i++)
 	{
-		for (int j = 0 ; j < predicted.size() ; j++)
+		nearest_neighbour =  dist (observations[i].x, observations[i].y, predicted[0].x, predicted[0].y);
+		for (int j = 1 ; j < predicted.size() ; j++)
 		{
 			if (nearest_neighbour > dist (predicted[j].x, predicted[j].y, observations[i].x, observations[i].y))
 			{
@@ -173,24 +174,29 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
 	double var_x = std_x * std_x;
 	double var_y = std_y * std_y;
-
+	std::vector <LandmarkObs> observations_tf ;
+	std::vector <LandmarkObs> predicted;
 	for (int i = 0; i < num_particles ; i++)
 	{
+		observations_tf.clear();
+		predicted.clear();
 		//particles[i].weight = 1.0;
 
 		//transform observations and call them observations_tf by arm041
-		std::vector <LandmarkObs> observations_tf;
+		std::vector <LandmarkObs> observations_tf ;
 		for (int j = 0; j < observations.size(); j++)
 		{
 			LandmarkObs temp;
 			temp.x = particles[i].x + observations[j].x *  cos(particles[i].theta) - observations[j].y *  sin(particles[i].theta);
 			temp.y = particles[i].y + observations[j].x *  sin(particles[i].theta) + observations[j].y *  cos(particles[i].theta);
-			temp.id = observations[i].id;
+			//temp.id = observations[i].id;
 
 			observations_tf.push_back (temp);
+			cout << "observation.x: " << observations[j].x << " observations transformed.x: " << observations_tf[i].x << endl;
+			cout << "observation.y: " << observations[j].y << " observations transformed.y: " << observations_tf[i].y << endl;
 		}
 		//cout << "observation size: " << observations.size() << "and transformed size: " << observations_tf.size() << endl;
-		std::vector <LandmarkObs> predicted;
+
 		// create predicted vector by going through landmarks in the map and choosing the ones in the range of sensors
 		for (int j = 0; j < map_landmarks.landmark_list.size() ; j++)
 		{
@@ -204,7 +210,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 				predicted.push_back(temp);
 			}
 		}
-		//cout << "size of predicted vector: " << predicted.size() << endl;
+		cout << "size of predicted vector: " << predicted.size() << endl;
 		dataAssociation (predicted, observations_tf);
 
 		particles[i].weight = 1.0;
@@ -216,7 +222,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			{
 				if (observations_tf[j].id == predicted[k].id)
 				{
-					particles[i].weight *=  (exp(-1*( pow((observations_tf[j].x - predicted[k].x),2) / (2 * var_x) +  pow((observations_tf[j].y - predicted[k].y),2) / (2 * var_y)))) / (2.0 * M_PI * std_x * std_y);
+					particles[i].weight *=  (exp(-1*( (pow((observations_tf[j].x - predicted[k].x),2) / (2 * var_x)) +  (pow((observations_tf[j].y - predicted[k].y),2) / (2 * var_y))))) / (2.0 * M_PI * std_x * std_y);
 					continue;
 				}
 			}
@@ -243,10 +249,8 @@ void ParticleFilter::resample() {
 
     for(int i = 0; i < num_particles; i++) {
     	int test = d(gen);
-    	cout << "hi test is " << test << endl;
         particles_temp.push_back(particles[test]);
-        weights[i] = particles_temp[i].weight;
-        cout << "Weight" << i << " = " << weights[i] << endl;
+
     }
 	particles = particles_temp;
 
